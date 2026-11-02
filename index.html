@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>給食献立表</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kosugi+Maru&display=swap">
+<style>
+/* 白い紙に黒い枠。その日の献立を行ごとに画面いっぱいに */
+:root{
+  --paper:#ffffff;
+  --ink:#111111;
+  --rule:#222222;
+  --muted:#6b6b6b;
+  --accent:#c2410c;
+  --font:"Kosugi Maru","Hiragino Maru Gothic ProN","BIZ UDPGothic","Meiryo",sans-serif;
+  color-scheme:light;
+}
+html,body{height:100%;margin:0}
+body{
+  background:var(--paper);color:var(--ink);font-family:var(--font);
+  display:flex;flex-direction:column;box-sizing:border-box;
+  padding-top:max(12px, env(safe-area-inset-top, 0px));
+  padding-bottom:max(12px, env(safe-area-inset-bottom, 0px));
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+}
+header{display:flex;align-items:center;gap:12px;padding-bottom:10px}
+#date{font-size:clamp(18px,3.2vw,30px);flex:1;min-width:0}
+#tag{color:var(--accent);font-size:.75em;margin-left:.5em}
+nav{display:flex;gap:6px}
+nav button{
+  font:inherit;font-size:clamp(16px,2.4vw,22px);background:var(--paper);color:var(--ink);
+  border:2px solid var(--rule);border-radius:6px;padding:4px 12px;cursor:pointer;
+}
+nav button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+nav button[disabled]{opacity:.3;cursor:default}
+#today{display:none}
+#today.show{display:inline-block}
+main{
+  flex:1;min-height:0;display:flex;flex-direction:column;
+  border:5px solid var(--rule);
+}
+.row{
+  flex:1;min-height:0;display:flex;align-items:center;
+  border-top:1.5px solid var(--rule);padding:0 .4em;overflow:hidden;
+}
+.row:first-child{border-top:none}
+.txt{min-width:0;max-width:100%;line-height:1.3;padding-top:.3em}
+.seg{display:inline-block;white-space:nowrap}
+rt{font-size:.38em;letter-spacing:.02em}
+.empty{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;gap:.4em;padding:1em;font-size:clamp(24px,8vmin,80px);
+}
+.empty small{font-size:.4em;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<header>
+  <div id="date"></div>
+</header>
+<main id="box"></main>
+
+<script>
+// 京都府立舞鶴支援学校 令和8年11月こんだてひょう
+// {漢字|よみ} はふりがな
+const MENU = {
+  "2026-11-02":["ごはん・{牛乳|ぎゅうにゅう}","{筑前|ちくぜん}{煮|に}","{小松菜|こまつな}の{香味和|こうみあ}え"],
+  "2026-11-03":["{元気|げんき}もりもり{丼|どん}・{牛乳|ぎゅうにゅう}","{具|ぐ}だくさんみそ{汁|しる}"],
+  "2026-11-04":["ハヤシライス・{牛乳|ぎゅうにゅう}","フルーツポンチ"],
+  "2026-11-05":["{牛乳|ぎゅうにゅう}・ミルメークコーヒー","バターパン","マカロニサラダ","{白菜|はくさい}のスープ"],
+  "2026-11-09":["ごはん・{牛乳|ぎゅうにゅう}","{鶏肉|とりにく}のごまみそがけ","きんぴらごぼう","すまし{汁|じる}"],
+  "2026-11-10":["きな{粉揚|こあ}げパン・{牛乳|ぎゅうにゅう}","{白菜|はくさい}のマヨネーズサラダ","ほうれん{草|そう}と{肉団子|にくだんご}のスープ"],
+  "2026-11-11":["ごはん・{牛乳|ぎゅうにゅう}","{麻婆豆腐|まーぼーどうふ}","{小松菜|こまつな}のナムル"],
+  "2026-11-12":["ジョア（いちご）・{味付|あじつ}けパン","ホキのパン{粉|こ}{焼|や}き","キャベツのソテー","ほうれん{草|そう}のスープ"],
+  "2026-11-13":["ごはん・{牛乳|ぎゅうにゅう}・ふりかけ","おでん","{切干大根|きりぼしだいこん}の{酢の物|すのもの}"],
+  "2026-11-16":["ごはん・{牛乳|ぎゅうにゅう}","すき{焼|や}き{風|ふう}{煮|に}","ひじきのマヨネーズサラダ"],
+  "2026-11-17":["ホットドッグサンド・{牛乳|ぎゅうにゅう}","ポトフ","{型抜|かたぬ}きチーズ（いちご）"],
+  "2026-11-19":["コッペパン・{牛乳|ぎゅうにゅう}","{白菜|はくさい}のクリーム{煮|に}","コールスローサラダ"],
+  "2026-11-20":["{鶏|とり}ごぼうごはん・{牛乳|ぎゅうにゅう}","さわらの{香味|こうみ}ソースかけ","{厚揚|あつあ}げのみそ{汁|しる}"],
+  "2026-11-24":["コッペパン・{牛乳|ぎゅうにゅう}","いちご＆マーガリンジャム","{焼|や}きビーフン","ミネストローネスープ"],
+  "2026-11-25":["ごはん・{牛乳|ぎゅうにゅう}","さわらの{塩|しお}{焼|や}き","はりはり{和|あ}え","{豚汁|ぶたじる}"],
+  "2026-11-26":["{黒糖|こくとう}パン・{牛乳|ぎゅうにゅう}","かぼちゃのひき{肉|にく}フライ","ゆでキャベツ","{玉|たま}ねぎのスープ"],
+  "2026-11-27":["カレーライス・{牛乳|ぎゅうにゅう}","キャベツの{甘酢和|あまずあ}え"],
+  "2026-11-30":["キムチチャーハン・{牛乳|ぎゅうにゅう}","{蒸|む}しシュウマイ","{春雨|はるさめ}スープ"]
+};
+const TAGS = {"2026-11-25":"★和食の日こんだて★"};
+const NOTES = {
+  "2026-11-18":"{短縮|たんしゅく}{校時|こうじ}のため",
+  "2026-11-23":"{勤労感謝|きんろうかんしゃ}の{日|ひ}"
+};
+const WEEK = ["日","月","火","水","木","金","土"];
+
+const pad = n => String(n).padStart(2,"0");
+const key = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const ruby = s => esc(s).replace(/\{([^|}]+)\|([^}]+)\}/g, "<ruby>$1<rt>$2</rt></ruby>");
+
+const now = new Date(); now.setHours(0,0,0,0);
+let cur = new Date(now);
+const first = new Date(2026,10,1), last = new Date(2026,10,30);
+
+const box = document.getElementById("box");
+const dateEl = document.getElementById("date");
+
+function render(){
+  const k = key(cur);
+  const items = MENU[k];
+  const tag = TAGS[k] ? `<span id="tag">${esc(TAGS[k])}</span>` : "";
+  dateEl.innerHTML = `${cur.getMonth()+1}月${cur.getDate()}日（${WEEK[cur.getDay()]}）${tag}`;
+  if(items){
+    // 「・」の後ろだけで折り返せるように区切る
+    const segs = t => t.split("・").map((s,i,a) => `<span class="seg">${ruby(s)}${i<a.length-1?"・":""}</span>`).join("");
+    box.innerHTML = items.map(t => `<div class="row"><span class="txt">${segs(t)}</span></div>`).join("");
+    fit();
+  }else{
+    const out = cur < first || cur > last;
+    const sub = out ? "11月の こんだてひょうです"
+      : NOTES[k] ? ruby(NOTES[k]) : "";
+    box.innerHTML = `<div class="empty"><div>きょうは<br>きゅうしょくが<br>ありません</div>${sub?`<small>${sub}</small>`:""}</div>`;
+    if(cur.getTime() !== now.getTime()) box.querySelector(".empty div").innerHTML = "きゅうしょくは<br>ありません";
+  }
+}
+
+// 文字をできるだけ大きく、全行おなじ大きさで枠に収める
+function fit(){
+  const rows = [...box.querySelectorAll(".row")];
+  if(!rows.length) return;
+  const set = fs => rows.forEach(r => r.style.fontSize = fs + "px");
+  const ok = () => rows.every(r => {
+    const t = r.firstElementChild;
+    return t.scrollWidth <= t.clientWidth + 1 && t.offsetHeight <= r.clientHeight;
+  });
+  // 縦向きなら折り返して大きく、横向きなら1行で、収まる最大の文字サイズを探す
+  let lo = 10, hi = rows[0].clientHeight;
+  for(let i=0;i<14;i++){
+    const mid = (lo + hi) / 2;
+    set(mid);
+    if(ok()) lo = mid; else hi = mid;
+  }
+  set(lo);
+}
+
+// 開きっぱなしでも日付が変わったら切り替える
+setInterval(() => {
+  const d = new Date(); d.setHours(0,0,0,0);
+  if(d.getTime() !== now.getTime()){ now.setTime(d.getTime()); cur = new Date(d); render(); }
+}, 60000);
+addEventListener("resize", fit);
+addEventListener("orientationchange", () => setTimeout(fit, 200));
+if(window.ResizeObserver) new ResizeObserver(() => fit()).observe(box);
+render();
+if(document.fonts) document.fonts.ready.then(fit);
+</script>
+</body>
+</html>
